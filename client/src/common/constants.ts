@@ -1,0 +1,10 @@
+export const FOV = 75.0;
+export const NEAR_PLANE = 0.1;
+export const FAR_PLANE = 1000;
+export const AMBIENT_LIGHT_COLOR = 0xffffff;
+export const DIRECTIONAL_LIGHT_COLOR = 0xffffff;
+export const SKY_COLOR = 0xaaaaaa;
+export const GROUND_COLOR = 0x0000ff;
+export const AMBIENT_LIGHT_INTENSITY = 0.5;
+export const DIRECTIONAL_LIGHT_INTENSITY = 1;
+export const HEMISPHERE_LIGHT_INTENSITY = 0.5;
