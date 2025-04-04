@@ -47,6 +47,21 @@ export default class BuildingCreator {
       floorBBox,
       groundBeamBBox
     );
+
+    this.resizeGroundBeams(groundBeams, groundBeamBBox);
+  }
+
+  private resizeGroundBeams(groundBeams: BuildingPart[], groundBeamBBox: THREE.Box3) {
+    const bboxSize = groundBeamBBox.getSize(new THREE.Vector3());
+    for (const beam of groundBeams) {
+      const {x, z} = beam.scale;
+      const heightScale = this.getScaleFactor(bboxSize.y, this.height);
+      beam.scale.set(x, heightScale, z);
+    }
+  }
+
+  private getScaleFactor(dimension: number, desiredDimension: number) {
+    return desiredDimension / dimension;
   }
 
   private moveGroundBeamsToPoints(
@@ -56,9 +71,7 @@ export default class BuildingCreator {
   ) {
     const cornerGroundBeamsPoints = this.getCornerGroundBeamsPoints(floorBBox);
     const groundBeamBBoxSize = groundBeamBBox.getSize(new THREE.Vector3());
-    const cornerPointsAdjustDistance = Math.abs(
-      Math.hypot(groundBeamBBoxSize.x, groundBeamBBoxSize.z) * 0.5
-    );
+    const cornerPointsAdjustDistance = Math.hypot(groundBeamBBoxSize.x, groundBeamBBoxSize.z) * 0.5;
     const floorBBoxCenter = floorBBox.getCenter(new THREE.Vector3());
     for (let i = 0; i < 4; ++i) {
       this.moveGroundBeamToPoint(
@@ -76,7 +89,7 @@ export default class BuildingCreator {
         groundBeams[i],
         floorBBoxCenter,
         midGroundBeamsPoints[j],
-        Math.abs(groundBeamBBoxSize.x * 0.5)
+        groundBeamBBoxSize.x * 0.5
       );
       this.addPart(groundBeams[i]);
     }
