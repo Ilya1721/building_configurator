@@ -8,3 +8,6 @@ export const GROUND_COLOR = 0x0000ff;
 export const AMBIENT_LIGHT_INTENSITY = 0.5;
 export const DIRECTIONAL_LIGHT_INTENSITY = 1;
 export const HEMISPHERE_LIGHT_INTENSITY = 0.5;
+export const MIN_BUILDING_DIMENSION = 2;
+export const MAX_BUILDING_DIMENSION = 8;
+export const BUILDING_DIMENSION_STEP = 1;

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { ArcballControls } from "three/examples/jsm/controls/ArcballControls.js";
+import { GUI } from "dat.gui";
 import './scene.css';
 import {
   AMBIENT_LIGHT_COLOR,
@@ -15,6 +16,7 @@ import {
   SKY_COLOR,
 } from "../common/constants";
 import { loadObjWithMtl } from "../lib/modelLoader";
+import { createGUI } from "../lib/buildingParamsGUI";
 
 const Scene: React.FC = () => {
   const sceneContainerRef = useRef<HTMLDivElement>(null);
@@ -22,6 +24,7 @@ const Scene: React.FC = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
   const rendererRef = useRef<THREE.WebGLRenderer>(null);
   const arcballControlsRef = useRef<ArcballControls>(null);
+  const guiRef = useRef<GUI>(null);
 
   const handleWindowResize = () => {
     if (!cameraRef.current || !rendererRef.current) return;
@@ -51,12 +54,21 @@ const Scene: React.FC = () => {
     initArcballControls();
   }, [initArcballControls]);
 
+  const onBuildClicked = (width: number, height: number, depth: number) => {
+
+  }
+
+  const initGUI = useCallback(() => {
+    guiRef.current = createGUI(onBuildClicked);
+  }, []);
+
   const initScene = useCallback(() => {
     sceneRef.current = new THREE.Scene();
     initRenderer();
     initCamera();
     addLights();
-  }, [initCamera]);
+    initGUI();
+  }, [initCamera, initGUI]);
 
   const initRenderer = () => {
     if (!sceneContainerRef.current) return;
