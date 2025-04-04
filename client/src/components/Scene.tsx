@@ -14,6 +14,7 @@ import {
   NEAR_PLANE,
   SKY_COLOR,
 } from "../common/constants";
+import { loadObjWithMtl } from "../lib/modelLoader";
 
 const Scene: React.FC = () => {
   const sceneContainerRef = useRef<HTMLDivElement>(null);
@@ -59,7 +60,7 @@ const Scene: React.FC = () => {
 
   const initRenderer = () => {
     if (!sceneContainerRef.current) return;
-    rendererRef.current = new THREE.WebGLRenderer({ antialias: true });
+    rendererRef.current = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     rendererRef.current.setSize(window.innerWidth, window.innerHeight);
     sceneContainerRef.current.appendChild(rendererRef.current.domElement);
   }
@@ -93,10 +94,10 @@ const Scene: React.FC = () => {
   }, []);
 
   const loadModel = () => {
-    const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshStandardMaterial({ color: "blue" });
-    const cube = new THREE.Mesh(geometry, material);
-    sceneRef.current?.add(cube);
+    if (!sceneRef.current) return;
+    loadObjWithMtl('/models/balk_150x150x1000.obj', '/models/balk_150x150x1000.mtl', sceneRef.current)
+      .then(() => console.log('Model loaded'))
+      .catch((err) => console.error('Error loading model:', err));
   }
 
   useEffect(() => {

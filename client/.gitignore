@@ -11,6 +11,10 @@
 # production
 /build
 
+/public/models
+/public/textures
+/public/materials
+
 # misc
 .DS_Store
 .env.local
