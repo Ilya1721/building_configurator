@@ -16,15 +16,21 @@ import {
   SKY_COLOR,
 } from "../common/constants";
 import { createGUI } from "../lib/buildingParamsGUI";
-import BuildingCreator from "../lib/buildingCreator";
+import BuildingCreator, { BuildingPart } from "../lib/buildingCreator";
+import CameraWrapper from "../lib/cameraWrapper";
+import SceneWrapper from "../lib/sceneWrapper";
 
 const Scene: React.FC = () => {
   const sceneContainerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
+  const cameraWrapperRef = useRef<CameraWrapper>(null);
+  const sceneWrapperRef = useRef<SceneWrapper>(null);
   const rendererRef = useRef<THREE.WebGLRenderer>(null);
   const arcballControlsRef = useRef<ArcballControls>(null);
   const guiRef = useRef<GUI>(null);
+  const animationFrameIdRef = useRef<number>(null);
+  const buildingPartsRef = useRef<BuildingPart[]>([]);
 
   const handleWindowResize = () => {
     if (!cameraRef.current || !rendererRef.current) return;
@@ -40,32 +46,49 @@ const Scene: React.FC = () => {
 
   const initArcballControls = useCallback(() => {
     if (!cameraRef.current || !rendererRef.current || !sceneRef.current) return;
-
     arcballControlsRef.current = new ArcballControls(cameraRef.current, rendererRef.current.domElement, sceneRef.current);
     arcballControlsRef.current.setGizmosVisible(false);
     arcballControlsRef.current.addEventListener("change", render);
   }, []);
 
   const initCamera = useCallback(() => {
+    if (!sceneRef.current) return;
     const aspectRatio = window.innerWidth / window.innerHeight;
     cameraRef.current = new THREE.PerspectiveCamera(FOV, aspectRatio, NEAR_PLANE, FAR_PLANE);
-    cameraRef.current.position.z = 2;
+    cameraWrapperRef.current = new CameraWrapper(cameraRef.current, sceneRef.current);
     window.addEventListener("resize", handleWindowResize);
     initArcballControls();
   }, [initArcballControls]);
 
-  const onBuildClicked = (width: number, height: number, depth: number) => {
-    if (!sceneRef.current) return;
+  const onBuildClicked = useCallback(async (width: number, height: number, depth: number) => {
+    if (!sceneRef.current || !cameraWrapperRef.current || !sceneWrapperRef.current) return;
     const buildingCreator = new BuildingCreator(width, height, depth, sceneRef.current);
-    buildingCreator.build();
+    cleanUpPreviousBuildingParts();
+    buildingPartsRef.current = await buildingCreator.build();
+    cameraWrapperRef.current.zoomToFit(getBuildingPartsBBox());
+  }, []);
+
+  const cleanUpPreviousBuildingParts = () => {
+    for (const part of buildingPartsRef.current) {
+      sceneRef.current?.remove(part);
+    }
+  }
+
+  const getBuildingPartsBBox = (): THREE.Box3 => {
+    const bbox = new THREE.Box3();
+    for (const part of buildingPartsRef.current) {
+      bbox.expandByObject(part);
+    }
+    return bbox;
   }
 
   const initGUI = useCallback(() => {
     guiRef.current = createGUI(onBuildClicked);
-  }, []);
+  }, [onBuildClicked]);
 
   const initScene = useCallback(() => {
     sceneRef.current = new THREE.Scene();
+    sceneWrapperRef.current = new SceneWrapper(sceneRef.current);
     initRenderer();
     initCamera();
     addLights();
@@ -94,16 +117,20 @@ const Scene: React.FC = () => {
   }
 
   const cleanup = useCallback(() => {
-    if (!rendererRef.current || !arcballControlsRef.current || !guiRef.current) return;
-    sceneContainerRef.current?.removeChild(rendererRef.current.domElement);
+    if (!rendererRef.current || !arcballControlsRef.current || !guiRef.current || !animationFrameIdRef.current) return;
+    cancelAnimationFrame(animationFrameIdRef.current);
     window.removeEventListener("resize", handleWindowResize);
     arcballControlsRef.current.removeEventListener("change", render);
+    arcballControlsRef.current.dispose();
     guiRef.current.destroy();
+    sceneWrapperRef.current?.cleanUp();
+    rendererRef.current.dispose();
+    rendererRef.current.domElement.remove();
   }, []);
 
   const animate = useCallback(() => {
     if (!rendererRef.current || !sceneRef.current || !cameraRef.current || !arcballControlsRef.current) return;
-    requestAnimationFrame(animate);
+    animationFrameIdRef.current = requestAnimationFrame(animate);
     arcballControlsRef.current.update();
     render();
   }, []);

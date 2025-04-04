@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { loadObjWithMtl } from "./modelLoader";
 
-type BuildingPart = THREE.Group<THREE.Object3DEventMap>;
+export type BuildingPart = THREE.Group<THREE.Object3DEventMap>;
 
 export default class BuildingCreator {
   constructor(
@@ -14,10 +14,11 @@ export default class BuildingCreator {
   private buildingParts: BuildingPart[] = [];
   private buildingBBox: THREE.Box3 = new THREE.Box3();
 
-  public async build(): Promise<void> {
+  public async build(): Promise<BuildingPart[]> {
     const floor = await this.buildFloor();
     await this.buildGroundBeams(floor);
     this.centerBuilding();
+    return this.buildingParts;
   }
 
   private async buildFloor(): Promise<BuildingPart> {
