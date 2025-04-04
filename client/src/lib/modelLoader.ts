@@ -6,11 +6,11 @@ export async function loadObjWithMtl(
   objPath: string,
   mtlPath: string,
   scene: THREE.Scene
-): Promise<void> {
+): Promise<THREE.Group<THREE.Object3DEventMap>> {
   return new Promise((resolve, reject) => {
     const onObjLoaded = (object: THREE.Group<THREE.Object3DEventMap>) => {
       scene.add(object);
-      resolve();
+      resolve(object);
     };
 
     const onObjLoadingFailed = (error: unknown) => {

@@ -15,8 +15,8 @@ import {
   NEAR_PLANE,
   SKY_COLOR,
 } from "../common/constants";
-import { loadObjWithMtl } from "../lib/modelLoader";
 import { createGUI } from "../lib/buildingParamsGUI";
+import BuildingCreator from "../lib/buildingCreator";
 
 const Scene: React.FC = () => {
   const sceneContainerRef = useRef<HTMLDivElement>(null);
@@ -49,13 +49,15 @@ const Scene: React.FC = () => {
   const initCamera = useCallback(() => {
     const aspectRatio = window.innerWidth / window.innerHeight;
     cameraRef.current = new THREE.PerspectiveCamera(FOV, aspectRatio, NEAR_PLANE, FAR_PLANE);
-    cameraRef.current.position.z = 5;
+    cameraRef.current.position.z = 2;
     window.addEventListener("resize", handleWindowResize);
     initArcballControls();
   }, [initArcballControls]);
 
   const onBuildClicked = (width: number, height: number, depth: number) => {
-
+    if (!sceneRef.current) return;
+    const buildingCreator = new BuildingCreator(width, height, depth, sceneRef.current);
+    buildingCreator.build();
   }
 
   const initGUI = useCallback(() => {
@@ -92,10 +94,11 @@ const Scene: React.FC = () => {
   }
 
   const cleanup = useCallback(() => {
-    if (!rendererRef.current || !arcballControlsRef.current) return;
+    if (!rendererRef.current || !arcballControlsRef.current || !guiRef.current) return;
     sceneContainerRef.current?.removeChild(rendererRef.current.domElement);
     window.removeEventListener("resize", handleWindowResize);
     arcballControlsRef.current.removeEventListener("change", render);
+    guiRef.current.destroy();
   }, []);
 
   const animate = useCallback(() => {
@@ -105,18 +108,10 @@ const Scene: React.FC = () => {
     render();
   }, []);
 
-  const loadModel = () => {
-    if (!sceneRef.current) return;
-    loadObjWithMtl('/models/balk_150x150x1000.obj', '/models/balk_150x150x1000.mtl', sceneRef.current)
-      .then(() => console.log('Model loaded'))
-      .catch((err) => console.error('Error loading model:', err));
-  }
-
   useEffect(() => {
     if (!sceneContainerRef.current) return;
 
     initScene();
-    loadModel();
     animate();
 
     return () => {
