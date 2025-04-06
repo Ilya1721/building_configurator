@@ -17,6 +17,7 @@ export default class BuildingCreator {
   public async build(): Promise<BuildingPart[]> {
     const floor = await this.buildFloor();
     await this.buildGroundBeams(floor);
+    await this.buildHorizontalRoofBeams();
     this.centerBuilding();
     return this.buildingParts;
   }
@@ -52,12 +53,22 @@ export default class BuildingCreator {
     this.resizeGroundBeams(groundBeams, groundBeamBBox);
   }
 
+  private async buildHorizontalRoofBeams(): Promise<void> {
+    const roofBeam = await loadObjWithMtl(
+      "/models/balk_150x150x1000.obj",
+      "/models/balk_150x150x1000.mtl",
+      this.scene
+    );
+    roofBeam.translateY(this.height);
+    roofBeam.scale.setX(this.width);
+    this.addPart(roofBeam);
+  }
+
   private resizeGroundBeams(groundBeams: BuildingPart[], groundBeamBBox: THREE.Box3) {
     const bboxSize = groundBeamBBox.getSize(new THREE.Vector3());
     for (const beam of groundBeams) {
-      const {x, z} = beam.scale;
       const heightScale = this.getScaleFactor(bboxSize.y, this.height);
-      beam.scale.set(x, heightScale, z);
+      beam.scale.setY(heightScale);
     }
   }
 
@@ -71,28 +82,29 @@ export default class BuildingCreator {
     groundBeamBBox: THREE.Box3
   ) {
     const cornerGroundBeamsPoints = this.getCornerGroundBeamsPoints(floorBBox);
-    const groundBeamBBoxSize = groundBeamBBox.getSize(new THREE.Vector3());
-    const cornerPointsAdjustDistance = Math.hypot(groundBeamBBoxSize.x, groundBeamBBoxSize.z) * 0.5;
+    const midGroundBeamsPoints = this.getMidGroundBeamsPoints(cornerGroundBeamsPoints);
     const floorBBoxCenter = floorBBox.getCenter(new THREE.Vector3());
-    for (let i = 0; i < 4; ++i) {
+    const groundBeamBBoxSize = groundBeamBBox.getSize(new THREE.Vector3());
+
+    for (let i = 0; i < 2; ++i) {
       this.moveGroundBeamToPoint(
         groundBeams[i],
         floorBBoxCenter,
-        cornerGroundBeamsPoints[i],
-        cornerPointsAdjustDistance
+        midGroundBeamsPoints[i],
+        groundBeamBBoxSize.x * 0.5
       );
       this.addPart(groundBeams[i]);
     }
 
-    const midGroundBeamsPoints = this.getMidGroundBeamsPoints(cornerGroundBeamsPoints);
-    for (let i = 4, j = 0; i < 6; ++i, ++j) {
-      this.moveGroundBeamToPoint(
-        groundBeams[i],
-        floorBBoxCenter,
-        midGroundBeamsPoints[j],
-        groundBeamBBoxSize.x * 0.5
-      );
-      this.addPart(groundBeams[i]);
+    const moveDistance = this.depth * 0.5 - groundBeamBBoxSize.z * 0.5;
+    const moveVector = new THREE.Vector3(0, 0, moveDistance);
+    const negMoveVector = moveVector.clone().negate();
+
+    for (let cornerIdx = 2, midIdx = 0; cornerIdx < 6; ++cornerIdx) {
+      const vec = cornerIdx % 2 === 1 ? negMoveVector : moveVector;
+      groundBeams[cornerIdx].position.copy(groundBeams[midIdx].position.clone().add(vec));
+      this.addPart(groundBeams[cornerIdx]);
+      midIdx = cornerIdx % 2 === 1 ? midIdx + 1 : midIdx;
     }
   }
 
