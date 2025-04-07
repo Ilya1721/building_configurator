@@ -9,6 +9,10 @@ interface GroundBeamsData {
   heightScale: number;
 }
 
+interface RoofBeamsData {
+  roofBeamBBox: THREE.Box3;
+}
+
 export default class BuildingCreator {
   constructor(
     private width: number,
@@ -24,8 +28,9 @@ export default class BuildingCreator {
     const floor = await this.buildFloor();
     const floorBBox = new THREE.Box3().setFromObject(floor);
     const { groundBeamBBox, heightScale } = await this.buildGroundBeams(floorBBox);
-    await this.buildHorizontalRoofBeams(groundBeamBBox);
+    const { roofBeamBBox } = await this.buildHorizontalRoofBeams(groundBeamBBox);
     await this.buildCornerBeams(groundBeamBBox, heightScale);
+    await this.buildRoofInternalLodges(roofBeamBBox);
     this.centerBuilding();
     return this.buildingParts;
   }
@@ -73,15 +78,20 @@ export default class BuildingCreator {
     return groundBeamBBox.getSize(new THREE.Vector3()).x;
   }
 
+  private getRoofBeamWidth(roofBeamBBox: THREE.Box3): number {
+    return roofBeamBBox.getSize(new THREE.Vector3()).y;
+  }
+
   private async buildHorizontalRoofBeams(
     groundBeamBBox: THREE.Box3
-  ): Promise<void> {
+  ): Promise<RoofBeamsData> {
     const firstRoofBeam = await loadObjWithMtl(
       "/models/balk_150x150x1000.obj",
       "/models/balk_150x150x1000.mtl",
       this.scene
     );
 
+    const roofBeamBBox = new THREE.Box3().setFromObject(firstRoofBeam);
     const groundBeamDepth = this.getGroundBeamDepth(groundBeamBBox);
     const groundBeamWidth = this.getGroundBeamWidth(groundBeamBBox);
 
@@ -104,6 +114,10 @@ export default class BuildingCreator {
     const fourthRoofBeam = this.copyPart(thirdRoofBeam, 1)[0];
     fourthRoofBeam.translateZ(this.width - groundBeamWidth);
     this.addPart(fourthRoofBeam);
+
+    return {
+      roofBeamBBox
+    }
   }
 
   private async buildCornerBeams(groundBeamBBox: THREE.Box3, heightScale: number) {
@@ -168,6 +182,38 @@ export default class BuildingCreator {
     const twelvethCornerBeam = this.copyPart(eleventhCornerBeam, 1)[0];
     twelvethCornerBeam.translateZ(-this.width + groundBeamWidth);
     this.addPart(twelvethCornerBeam);
+  }
+
+  private async buildRoofInternalLodges(roofBeamBBox: THREE.Box3) {
+    const firstLodge = await loadObjWithMtl(
+      "/models/Lodge_20x200x1000.obj",
+      "/models/Lodge_20x200x1000.mtl",
+      this.scene
+    );
+
+    const roofBeamWidth = this.getRoofBeamWidth(roofBeamBBox);
+    firstLodge.scale.setX(this.width + 0.36);
+    firstLodge.translateY(this.height + roofBeamWidth + 0.1);
+    firstLodge.translateZ(0.18);
+    firstLodge.translateX(-0.18);
+    this.addPart(firstLodge);
+
+    const secondLodge = this.copyPart(firstLodge, 1)[0];
+    secondLodge.translateZ(-this.depth - 0.36);
+    this.addPart(secondLodge);
+
+    const firstLodgeBBox = new THREE.Box3().setFromObject(firstLodge);
+    const firstLodgeBBoxSize = firstLodgeBBox.getSize(new THREE.Vector3());
+    const thirdLodge = this.copyPart(firstLodge, 1)[0];
+    thirdLodge.scale.setX(this.depth + 0.36 - firstLodgeBBoxSize.z);
+    thirdLodge.rotateY(THREE.MathUtils.degToRad(90));
+    this.addPart(thirdLodge);
+
+    const fourthLodge = this.copyPart(thirdLodge, 1)[0];
+    fourthLodge.scale.setX(this.depth + 0.36 + firstLodgeBBoxSize.z);
+    fourthLodge.translateZ(this.width + 0.36);
+    fourthLodge.translateX(-firstLodgeBBoxSize.z);
+    this.addPart(fourthLodge);
   }
 
   private resizeGroundBeams(
