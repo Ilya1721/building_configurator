@@ -3,6 +3,12 @@ import { loadObjWithMtl } from "./modelLoader";
 
 export type BuildingPart = THREE.Group<THREE.Object3DEventMap>;
 
+interface GroundBeamsData {
+  groundBeams: BuildingPart[];
+  groundBeamBBox: THREE.Box3;
+  heightScale: number;
+}
+
 export default class BuildingCreator {
   constructor(
     private width: number,
@@ -16,8 +22,10 @@ export default class BuildingCreator {
 
   public async build(): Promise<BuildingPart[]> {
     const floor = await this.buildFloor();
-    const groundBeams = await this.buildGroundBeams(floor);
-    await this.buildHorizontalRoofBeams(floor, groundBeams[0]);
+    const floorBBox = new THREE.Box3().setFromObject(floor);
+    const { groundBeamBBox, heightScale } = await this.buildGroundBeams(floorBBox);
+    await this.buildHorizontalRoofBeams(groundBeamBBox);
+    await this.buildCornerBeams(groundBeamBBox, heightScale);
     this.centerBuilding();
     return this.buildingParts;
   }
@@ -33,7 +41,9 @@ export default class BuildingCreator {
     return floor;
   }
 
-  private async buildGroundBeams(floor: BuildingPart): Promise<BuildingPart[]> {
+  private async buildGroundBeams(
+    floorBBox: THREE.Box3
+  ): Promise<GroundBeamsData> {
     const groundBeam = await loadObjWithMtl(
       "/models/balk_150x150x2200.obj",
       "/models/balk_150x150x2200.mtl",
@@ -42,12 +52,17 @@ export default class BuildingCreator {
 
     const groundBeams = [groundBeam, ...this.copyPart(groundBeam, 5)];
     const groundBeamBBox = new THREE.Box3().setFromObject(groundBeam);
-    const floorBBox = new THREE.Box3().setFromObject(floor);
-
     this.moveGroundBeamsToPoints(groundBeams, floorBBox, groundBeamBBox);
-    this.resizeGroundBeams(groundBeams, groundBeamBBox);
 
-    return groundBeams;
+    const groundBeamBBoxSize = groundBeamBBox.getSize(new THREE.Vector3());
+    const heightScale = this.getScaleFactor(groundBeamBBoxSize.y, this.height);
+    this.resizeGroundBeams(groundBeams, heightScale);
+
+    return {
+      groundBeams,
+      groundBeamBBox,
+      heightScale
+    };
   }
 
   private getGroundBeamDepth(groundBeamBBox: THREE.Box3): number {
@@ -59,8 +74,7 @@ export default class BuildingCreator {
   }
 
   private async buildHorizontalRoofBeams(
-    floor: BuildingPart,
-    groundBeam: BuildingPart
+    groundBeamBBox: THREE.Box3
   ): Promise<void> {
     const firstRoofBeam = await loadObjWithMtl(
       "/models/balk_150x150x1000.obj",
@@ -68,15 +82,12 @@ export default class BuildingCreator {
       this.scene
     );
 
-    const groundBeamBBox = new THREE.Box3().setFromObject(groundBeam);
     const groundBeamDepth = this.getGroundBeamDepth(groundBeamBBox);
     const groundBeamWidth = this.getGroundBeamWidth(groundBeamBBox);
-    const floorBBox = new THREE.Box3().setFromObject(floor);
-    const leftBottomCorner = this.getCornerGroundBeamsPoints(floorBBox)[3];
 
     firstRoofBeam.translateY(this.height);
     firstRoofBeam.scale.setX(this.width);
-    firstRoofBeam.position.z = leftBottomCorner.z - groundBeamDepth * 0.5;
+    firstRoofBeam.position.z = -groundBeamDepth * 0.5;
     this.addPart(firstRoofBeam);
 
     const secondRoofBeam = this.copyPart(firstRoofBeam, 1)[0];
@@ -95,13 +106,75 @@ export default class BuildingCreator {
     this.addPart(fourthRoofBeam);
   }
 
+  private async buildCornerBeams(groundBeamBBox: THREE.Box3, heightScale: number) {
+    const firstCornerBeam = await loadObjWithMtl(
+      "/models/balk_corner.obj",
+      "/models/balk_corner.mtl",
+      this.scene
+    );
+    firstCornerBeam.scale.setY(heightScale);
+
+    const groundBeamBBoxSize = groundBeamBBox.getSize(new THREE.Vector3());
+    firstCornerBeam.translateZ(-groundBeamBBoxSize.z * 0.5);
+    firstCornerBeam.translateX(groundBeamBBoxSize.x);
+    this.addPart(firstCornerBeam);
+
+    const secondCornerBeam = this.copyPart(firstCornerBeam, 1)[0];
+    const groundBeamWidth = this.getGroundBeamWidth(groundBeamBBox);
+    const groundBeamDepth = this.getGroundBeamDepth(groundBeamBBox);
+    secondCornerBeam.translateX(this.width - groundBeamWidth * 2);
+    secondCornerBeam.rotateY(THREE.MathUtils.degToRad(180));
+    this.addPart(secondCornerBeam);
+
+    const thirdCornerBeam = this.copyPart(firstCornerBeam, 1)[0];
+    const fourthCornerBeam = this.copyPart(secondCornerBeam, 1)[0];
+    thirdCornerBeam.translateZ(-this.depth + groundBeamDepth);
+    fourthCornerBeam.translateZ(this.depth - groundBeamDepth);
+    this.addPart(thirdCornerBeam);
+    this.addPart(fourthCornerBeam);
+
+    const fifthCornerBeam = this.copyPart(firstCornerBeam, 1)[0];
+    fifthCornerBeam.rotateY(THREE.MathUtils.degToRad(90));
+    fifthCornerBeam.translateZ(-groundBeamWidth * 0.5);
+    fifthCornerBeam.translateX(groundBeamDepth * 0.5);
+    this.addPart(fifthCornerBeam);
+
+    const sixthCornerBeam = this.copyPart(fifthCornerBeam, 1)[0];
+    sixthCornerBeam.translateZ(this.width - groundBeamWidth);
+    this.addPart(sixthCornerBeam);
+
+    const seventhCornerBeam = this.copyPart(thirdCornerBeam, 1)[0];
+    seventhCornerBeam.rotateY(THREE.MathUtils.degToRad(-90));
+    seventhCornerBeam.translateZ(groundBeamWidth * 0.5);
+    seventhCornerBeam.translateX(groundBeamDepth * 0.5);
+    this.addPart(seventhCornerBeam);
+
+    const eighthCornerBeam = this.copyPart(seventhCornerBeam, 1)[0];
+    eighthCornerBeam.translateZ(-this.width + groundBeamWidth);
+    this.addPart(eighthCornerBeam);
+
+    const ninethCornerBeam = this.copyPart(fifthCornerBeam, 1)[0];
+    ninethCornerBeam.translateX(0.5 * (this.depth - groundBeamDepth));
+    this.addPart(ninethCornerBeam);
+
+    const tenthCornerBeam = this.copyPart(ninethCornerBeam, 1)[0];
+    tenthCornerBeam.translateZ(this.width - groundBeamWidth);
+    this.addPart(tenthCornerBeam);
+
+    const eleventhCornerBeam = this.copyPart(seventhCornerBeam, 1)[0];
+    eleventhCornerBeam.translateX(0.5 * (this.depth - groundBeamDepth));
+    this.addPart(eleventhCornerBeam);
+
+    const twelvethCornerBeam = this.copyPart(eleventhCornerBeam, 1)[0];
+    twelvethCornerBeam.translateZ(-this.width + groundBeamWidth);
+    this.addPart(twelvethCornerBeam);
+  }
+
   private resizeGroundBeams(
     groundBeams: BuildingPart[],
-    groundBeamBBox: THREE.Box3
+    heightScale: number
   ) {
-    const bboxSize = groundBeamBBox.getSize(new THREE.Vector3());
     for (const beam of groundBeams) {
-      const heightScale = this.getScaleFactor(bboxSize.y, this.height);
       beam.scale.setY(heightScale);
     }
   }
